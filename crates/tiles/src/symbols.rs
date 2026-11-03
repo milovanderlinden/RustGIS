@@ -88,6 +88,8 @@ pub struct Collide {
     /// Others may be placed over it.
     pub text_ignore_placement: bool,
     pub icon_ignore_placement: bool,
+    /// Its halo keeps no room clear, as a thin one doesn't.
+    pub halo_free: bool,
 }
 
 impl Default for Collide {
@@ -101,6 +103,7 @@ impl Default for Collide {
             icon_allow_overlap: false,
             text_ignore_placement: false,
             icon_ignore_placement: false,
+            halo_free: false,
         }
     }
 }
@@ -268,6 +271,7 @@ fn label_of(layer: &StyleLayer, ctx: &FeatureCtx, sheet: Option<&Sprite>, layer_
         icon_allow_overlap: flag(layer, "icon-allow-overlap", ctx),
         text_ignore_placement: flag(layer, "text-ignore-placement", ctx),
         icon_ignore_placement: flag(layer, "icon-ignore-placement", ctx),
+        halo_free: false,
     };
     Some(Label {
         text,

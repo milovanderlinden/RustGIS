@@ -257,6 +257,8 @@ pub struct PlacedIcon {
     pub h: f32,
     /// Turned with the map (an arrow along a street), in radians clockwise; `None` is upright.
     pub angle: Option<f32>,
+    /// How solid it is, 0 to 1: its tile layer's opacity.
+    pub opacity: f32,
 }
 
 pub struct Rendered {
@@ -4371,7 +4373,7 @@ fn draw_icon(pm: &mut Canvas, icon: &PlacedIcon, ppp: f32) {
     // Scaled about its centre, turned there, then put in place.
     let turn = icon.angle.filter(|a| a.is_finite()).map_or(0.0, f32::to_degrees);
     let t = Transform::from_translate(-iw / 2.0, -ih / 2.0).post_scale(sx, sy).post_rotate(turn).post_translate(cx, cy);
-    let paint = PixmapPaint { quality: tiny_skia::FilterQuality::Bilinear, ..PixmapPaint::default() };
+    let paint = PixmapPaint { opacity: icon.opacity, quality: tiny_skia::FilterQuality::Bilinear, ..PixmapPaint::default() };
     pm.draw_pixmap(0, 0, Pixmap::as_ref(&icon.image), &paint, t, None);
 }
 
@@ -5206,7 +5208,7 @@ fn label_boxes(l: &PlacedLabel) -> (Vec<[f32; 4]>, Vec<[f32; 4]>) {
         // size and the drawing have it): another label's text must not fall under it. A width
         // kept with the halo turned off reserves nothing. A background reaches as far as its
         // padding across, and up and down.
-        let halo = text::drawn_halo_reach(l);
+        let halo = if l.collide.halo_free { 0.0 } else { text::drawn_halo_reach(l) };
         let [across, up_down] = text::background_reach(l).map(|r| l.collide.text_padding.clamp(0.0, 100.0) + halo.max(r));
         let p = across.max(up_down);
         let cx = l.center_x();
@@ -5481,7 +5483,7 @@ mod tests {
         let icon = |x: f32| {
             let mut p = Pixmap::new(4, 4).unwrap();
             p.fill(tiny_skia::Color::from_rgba8(0, 0, 255, 255));
-            PlacedIcon { image: std::sync::Arc::new(p), x, y: 20.0, w: 10.0, h: 10.0, angle: None }
+            PlacedIcon { image: std::sync::Arc::new(p), x, y: 20.0, w: 10.0, h: 10.0, angle: None, opacity: 1.0 }
         };
         // Two icons on the same spot collide even with no text; one far away doesn't.
         let cands = vec![
@@ -5498,6 +5500,10 @@ mod tests {
         let mut pm = Pixmap::new(200, 40).unwrap();
         crate::canvas::with_canvas(&mut pm, |c| draw_icon(c, &icon(50.0), 1.0));
         let px = pm.pixel(50, 20).unwrap();
+        // At its layer's opacity.
+        let mut faded = Pixmap::new(200, 40).unwrap();
+        crate::canvas::with_canvas(&mut faded, |c| draw_icon(c, &PlacedIcon { opacity: 0.5, ..icon(50.0) }, 1.0));
+        assert!(faded.pixel(50, 20).unwrap().alpha().abs_diff(128) <= 1);
         assert_eq!((px.blue(), px.alpha()), (255, 255));
         assert_eq!(pm.pixel(60, 20).unwrap().alpha(), 0);
     }
@@ -5505,7 +5511,7 @@ mod tests {
     fn icon_at(x: f32, y: f32, w: f32, h: f32, angle: Option<f32>) -> PlacedIcon {
         let mut p = Pixmap::new(4, 4).unwrap();
         p.fill(tiny_skia::Color::from_rgba8(0, 0, 255, 255));
-        PlacedIcon { image: std::sync::Arc::new(p), x, y, w, h, angle }
+        PlacedIcon { image: std::sync::Arc::new(p), x, y, w, h, angle, opacity: 1.0 }
     }
 
     fn texts(p: &Placement) -> Vec<&str> {
